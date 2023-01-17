@@ -59,7 +59,7 @@ if uploaded_file:
         
     ddf1['자카드'] = 자카드
     
-    st.table(ddf1)
+    st.dataframe(ddf1)
     
     
    

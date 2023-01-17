@@ -59,7 +59,7 @@ if uploaded_file:
         
     ddf1['자카드'] = 자카드
     
-    st.dataframe(ddf1)
+   # st.dataframe(ddf1)
     
     
    
@@ -70,7 +70,7 @@ if uploaded_file:
 
     # -- DOWNLOAD SECTION
     st.subheader('자카드Downloads:')
-#    generate_excel_download_link(ddf1)
+    generate_excel_download_link(ddf1)
 #     generate_html_download_link(m)
 
 

@@ -70,7 +70,7 @@ if uploaded_file:
 
     # -- DOWNLOAD SECTION
     st.subheader('자카드Downloads:')
-    generate_excel_download_link(ddf1)
+#    generate_excel_download_link(ddf1)
 #     generate_html_download_link(m)
 
 

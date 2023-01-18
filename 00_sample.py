@@ -42,7 +42,7 @@ if uploaded_file:
     df = pd.read_excel(uploaded_file, engine='openpyxl')
     st.dataframe(df)
     
-    ddf = pd.merge(df,df, on=['고교코드','과목'], how = 'left')
+    ddf = pd.merge(df,df, on=['고교코드','편제'], how = 'left')
     
     ddf1 = ddf[ddf['수험번호_x']!=ddf['수험번호_y']]
     
@@ -63,7 +63,7 @@ if uploaded_file:
     
     
    
-    ddf2 = ddf1[['수험번호_x', '합격_x', '모집단위_x','편제_x','과목','수험번호_y','편제_y','자카드']]	
+    ddf2 = ddf1[['수험번호_x', '합격_x', '모집단위_x','편제','과목_x','수험번호_y','과목_y','자카드']]	
     
     
 

@@ -7,7 +7,8 @@ class SimilarityService {
   }
 
   /**
-   * Calculate similarity between two texts using multiple methods
+   * Calculate similarity between two texts using character-based matching
+   * Simple and intuitive: if 10 characters total and 2 are same = 20% similarity
    * @param {string} text1 - First text
    * @param {string} text2 - Second text
    * @returns {number} Similarity score (0-1)
@@ -15,23 +16,40 @@ class SimilarityService {
   calculateSimilarity(text1, text2) {
     if (!text1 || !text2) return 0;
 
-    // Normalize texts
-    const normalized1 = this.normalizeText(text1);
-    const normalized2 = this.normalizeText(text2);
+    // Normalize texts (remove special chars, keep spaces for better matching)
+    const normalized1 = text1.toLowerCase().trim();
+    const normalized2 = text2.toLowerCase().trim();
 
-    // Calculate using string similarity (Dice coefficient)
-    const diceSimilarity = stringSimilarity.compareTwoStrings(normalized1, normalized2);
+    if (normalized1 === normalized2) return 1;
 
-    // Calculate using Levenshtein distance
-    const levenshteinSimilarity = this.levenshteinSimilarity(normalized1, normalized2);
+    // Use Longest Common Subsequence (LCS) for character matching
+    const lcsLength = this.getLCSLength(normalized1, normalized2);
+    const maxLength = Math.max(normalized1.length, normalized2.length);
 
-    // Calculate Jaccard similarity
-    const jaccardSimilarity = this.jaccardSimilarity(normalized1, normalized2);
+    // Similarity = matching characters / total characters
+    return lcsLength / maxLength;
+  }
 
-    // Weighted average of different methods
-    const avgSimilarity = (diceSimilarity * 0.5 + levenshteinSimilarity * 0.3 + jaccardSimilarity * 0.2);
+  /**
+   * Get Longest Common Subsequence length
+   * This finds how many characters match in order
+   */
+  getLCSLength(str1, str2) {
+    const m = str1.length;
+    const n = str2.length;
+    const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
 
-    return avgSimilarity;
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (str1[i - 1] === str2[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1] + 1;
+        } else {
+          dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        }
+      }
+    }
+
+    return dp[m][n];
   }
 
   /**
@@ -110,16 +128,37 @@ class SimilarityService {
   }
 
   /**
-   * Highlight differences between two texts
+   * Highlight differences between two texts with detailed character-level analysis
    */
   highlightDifferences(text1, text2) {
-    const words1 = this.tokenizer.tokenize(text1.toLowerCase()) || [];
-    const words2 = this.tokenizer.tokenize(text2.toLowerCase()) || [];
+    const words1 = this.tokenizer.tokenize(text1) || [];
+    const words2 = this.tokenizer.tokenize(text2) || [];
 
-    const added = words2.filter(w => !words1.includes(w));
-    const removed = words1.filter(w => !words2.includes(w));
+    // Word-level differences
+    const words1Lower = words1.map(w => w.toLowerCase());
+    const words2Lower = words2.map(w => w.toLowerCase());
 
-    return { added, removed };
+    const added = words2.filter((w, i) => !words1Lower.includes(w.toLowerCase()));
+    const removed = words1.filter((w, i) => !words2Lower.includes(w.toLowerCase()));
+    const common = words1.filter((w, i) => words2Lower.includes(w.toLowerCase()));
+
+    // Character-level analysis
+    const lcsLength = this.getLCSLength(text1.toLowerCase(), text2.toLowerCase());
+    const maxLength = Math.max(text1.length, text2.length);
+    const matchingChars = lcsLength;
+    const totalChars = maxLength;
+
+    return {
+      added,
+      removed,
+      common,
+      matchingChars,
+      totalChars,
+      wordsSame: common.length,
+      wordsAdded: added.length,
+      wordsRemoved: removed.length,
+      totalWords: Math.max(words1.length, words2.length)
+    };
   }
 
   /**

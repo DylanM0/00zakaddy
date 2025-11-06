@@ -6,6 +6,7 @@ const ComparisonResult = ({ result, mode }) => {
   const [selectedSourceLine, setSelectedSourceLine] = useState(null);
   const [selectedTargetLine, setSelectedTargetLine] = useState(null);
   const [hoveredSourceLine, setHoveredSourceLine] = useState(null);
+  const [selectedTargetIndex, setSelectedTargetIndex] = useState(0); // For one-to-many mode
 
   const toggleMatch = (index) => {
     setExpandedMatches(prev => ({
@@ -334,80 +335,331 @@ const ComparisonResult = ({ result, mode }) => {
   }
 
   // One-to-Many mode
+  const selectedTarget = result.results[selectedTargetIndex];
+
+  // Create a one-to-one comparison object for the selected target
+  const oneToOneComparison = {
+    source: result.source,
+    target: {
+      name: selectedTarget.targetName,
+      text: selectedTarget.targetText,
+      lines: selectedTarget.targetLines
+    },
+    comparison: {
+      overallSimilarity: selectedTarget.overallSimilarity,
+      totalMatches: selectedTarget.totalMatches,
+      matches: selectedTarget.matches,
+      sourceLines: result.source.lines.length,
+      targetLines: selectedTarget.targetLines.length
+    },
+    statistics: selectedTarget.statistics
+  };
+
   return (
     <div className="comparison-result">
       <div className="result-header">
-        <h2>비교 결과</h2>
+        <h2>다중 문서 비교 결과</h2>
         <div className="source-info">
           <span className="label">원본 문서:</span>
           <span className="value">{result.source.name}</span>
         </div>
       </div>
 
-      <div className="targets-overview">
-        {result.results.map((targetResult, idx) => (
-          <div key={idx} className="target-summary-card">
-            <div className="target-header">
-              <h4>{targetResult.targetName}</h4>
-              <div
-                className="similarity-badge large"
-                style={{
-                  backgroundColor: getSimilarityColor(targetResult.overallSimilarity),
-                  color: '#0f172a',
-                  borderColor: getSimilarityColor(targetResult.overallSimilarity)
-                }}
-              >
-                {targetResult.overallSimilarity.toFixed(1)}%
+      {/* Overall Summary */}
+      <div className="multi-document-summary">
+        <h3>전체 비교 요약 ({result.results.length}개 문서)</h3>
+        <div className="summary-grid">
+          {result.results.map((targetResult, idx) => (
+            <div
+              key={idx}
+              className={`summary-card ${selectedTargetIndex === idx ? 'selected' : ''}`}
+              onClick={() => {
+                setSelectedTargetIndex(idx);
+                setSelectedSourceLine(null);
+                setSelectedTargetLine(null);
+              }}
+            >
+              <div className="summary-card-header">
+                <h4>{targetResult.targetName}</h4>
+                <div
+                  className="similarity-badge"
+                  style={{
+                    backgroundColor: getSimilarityColor(targetResult.overallSimilarity),
+                    color: '#0f172a',
+                    borderColor: getSimilarityColor(targetResult.overallSimilarity)
+                  }}
+                >
+                  {targetResult.overallSimilarity.toFixed(1)}%
+                </div>
+              </div>
+              <div className="summary-stats">
+                <div className="summary-stat">
+                  <span className="summary-stat-value">{targetResult.totalMatches}</span>
+                  <span className="summary-stat-label">일치 항목</span>
+                </div>
+                <div className="summary-stat">
+                  <span className="summary-stat-value">{targetResult.statistics.sourceMatchPercentage}%</span>
+                  <span className="summary-stat-label">원본 일치율</span>
+                </div>
               </div>
             </div>
-            <div className="target-stats">
-              <div className="stat">
-                <span className="stat-label">일치 항목</span>
-                <span className="stat-value">{targetResult.totalMatches}</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label">원본 일치율</span>
-                <span className="stat-value">{targetResult.statistics.sourceMatchPercentage}%</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label">대상 일치율</span>
-                <span className="stat-value">{targetResult.statistics.targetMatchPercentage}%</span>
-              </div>
-            </div>
+          ))}
+        </div>
+      </div>
 
-            <div className="target-details">
-              <h5>상위 일치 항목 (Top 5)</h5>
-              <div className="top-matches">
-                {targetResult.matches.slice(0, 5).map((match, mIdx) => (
-                  <div key={mIdx} className="mini-match" style={{
-                    borderLeftColor: getSimilarityColor(match.similarity)
-                  }}>
-                    <div className="mini-match-header">
-                      <span
-                        className="similarity-badge small"
-                        style={{
-                          backgroundColor: getSimilarityColor(match.similarity),
-                          color: '#0f172a',
-                          borderColor: getSimilarityColor(match.similarity)
-                        }}
-                      >
-                        {match.similarity}%
-                      </span>
-                      <span className="line-info-small">
-                        원본 {match.sourceLineIndex + 1}번 → 대상 {match.targetLineIndex + 1}번
-                      </span>
-                    </div>
-                    <p className="match-preview">
-                      {match.sourceLine.length > 150
-                        ? match.sourceLine.substring(0, 150) + '...'
-                        : match.sourceLine}
-                    </p>
-                  </div>
-                ))}
-              </div>
+      {/* Target Selector */}
+      <div className="target-selector">
+        <label htmlFor="target-select">비교 대상 선택:</label>
+        <select
+          id="target-select"
+          value={selectedTargetIndex}
+          onChange={(e) => {
+            setSelectedTargetIndex(parseInt(e.target.value));
+            setSelectedSourceLine(null);
+            setSelectedTargetLine(null);
+          }}
+        >
+          {result.results.map((targetResult, idx) => (
+            <option key={idx} value={idx}>
+              {targetResult.targetName} (유사도: {targetResult.overallSimilarity.toFixed(1)}%)
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Detailed Comparison for Selected Target (same as 1:1 mode) */}
+      <div className="selected-target-comparison">
+        <h3>상세 비교: {selectedTarget.targetName}</h3>
+
+        <div className="statistics-grid">
+          <div className="stat-card">
+            <div className="stat-icon">
+              <FiCheck />
+            </div>
+            <div className="stat-content">
+              <span className="stat-value">{selectedTarget.totalMatches}</span>
+              <span className="stat-label">일치하는 항목</span>
             </div>
           </div>
-        ))}
+
+          <div className="stat-card">
+            <div className="stat-icon">
+              <FiAlertCircle />
+            </div>
+            <div className="stat-content">
+              <span className="stat-value">{selectedTarget.statistics.sourceMatchPercentage}%</span>
+              <span className="stat-label">원본 일치율</span>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">
+              <FiAlertCircle />
+            </div>
+            <div className="stat-content">
+              <span className="stat-value">{selectedTarget.statistics.targetMatchPercentage}%</span>
+              <span className="stat-label">대상 일치율</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="documents-container">
+          <div className="document-panel">
+            <h3>원본 문서</h3>
+            <div className="document-name">{result.source.name}</div>
+            <div className="document-content">
+              {result.source.lines.map((line, idx) => {
+                const matches = selectedTarget.matches.filter(m => m.sourceLineIndex === idx);
+                const highestMatch = matches.length > 0 ? matches[0] : null;
+                const isSelected = selectedSourceLine === idx;
+
+                return (
+                  <div
+                    key={idx}
+                    id={`source-line-${idx}`}
+                    className={`line ${highestMatch ? 'highlighted' : ''} ${isSelected ? 'selected' : ''}`}
+                    style={highestMatch ? {
+                      backgroundColor: getLineBackgroundColor(highestMatch.similarity),
+                      cursor: 'pointer'
+                    } : {}}
+                    onClick={() => {
+                      if (highestMatch) {
+                        setSelectedSourceLine(idx);
+                        setSelectedTargetLine(highestMatch.targetLineIndex);
+                        const targetElement = document.getElementById(`target-line-${highestMatch.targetLineIndex}`);
+                        if (targetElement) {
+                          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }
+                    }}
+                    onMouseEnter={() => setHoveredSourceLine(idx)}
+                    onMouseLeave={() => setHoveredSourceLine(null)}
+                  >
+                    <span className="line-number">{idx + 1}</span>
+                    <span className="line-text">{line}</span>
+
+                    {hoveredSourceLine === idx && matches.length > 0 && (
+                      <div className="line-tooltip">
+                        {matches.map((match, mIdx) => (
+                          <div key={mIdx}>
+                            {selectedTarget.targetName}의 {match.targetLineIndex + 1}번째 문장과 {match.similarity}% 유사
+                            {mIdx < matches.length - 1 && <br />}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="document-panel">
+            <h3>비교 문서</h3>
+            <div className="document-name">{selectedTarget.targetName}</div>
+            <div className="document-content">
+              {selectedTarget.targetLines.map((line, idx) => {
+                const match = selectedTarget.matches.find(m => m.targetLineIndex === idx);
+                const isSelected = selectedTargetLine === idx;
+
+                return (
+                  <div
+                    key={idx}
+                    id={`target-line-${idx}`}
+                    className={`line ${match ? 'highlighted' : ''} ${isSelected ? 'selected' : ''}`}
+                    style={match ? {
+                      backgroundColor: getLineBackgroundColor(match.similarity),
+                      cursor: 'pointer'
+                    } : {}}
+                    onClick={() => {
+                      if (match) {
+                        setSelectedTargetLine(idx);
+                        setSelectedSourceLine(match.sourceLineIndex);
+                        const sourceElement = document.getElementById(`source-line-${match.sourceLineIndex}`);
+                        if (sourceElement) {
+                          sourceElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }
+                    }}
+                  >
+                    <span className="line-number">{idx + 1}</span>
+                    <span className="line-text">{line}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="matches-section">
+          <h3>일치 항목 상세 ({selectedTarget.matches.length}개)</h3>
+          <div className="matches-list">
+            {selectedTarget.matches.map((match, idx) => (
+              <div key={idx} className="match-item">
+                <div className="match-header" onClick={() => toggleMatch(idx)}>
+                  <div className="match-info">
+                    <span className="match-index">#{idx + 1}</span>
+                    <div
+                      className="similarity-badge"
+                      style={{
+                        backgroundColor: getSimilarityColor(match.similarity),
+                        color: '#0f172a',
+                        borderColor: getSimilarityColor(match.similarity)
+                      }}
+                    >
+                      {match.similarity}%
+                    </div>
+                    <span className="line-info">
+                      원본 {match.sourceLineIndex + 1}번 ↔ 대상 {match.targetLineIndex + 1}번
+                    </span>
+                  </div>
+                  <button className="expand-btn">
+                    {expandedMatches[idx] ? <FiChevronUp /> : <FiChevronDown />}
+                  </button>
+                </div>
+
+                {expandedMatches[idx] && (
+                  <div className="match-details">
+                    <div className="text-comparison">
+                      <div className="text-item">
+                        <label>원본 문장:</label>
+                        <p>{highlightText(match.sourceLine, match.differences)}</p>
+                      </div>
+                      <div className="text-item">
+                        <label>비교 문장:</label>
+                        <p>{highlightText(match.targetLine, match.differences)}</p>
+                      </div>
+                    </div>
+
+                    {match.differences?.matchingChars && (
+                      <div className="char-stats">
+                        <div className="char-stats-title">유사도 상세 분석</div>
+                        <div className="char-stats-content">
+                          <div className="char-stat">
+                            <span className="char-stat-label">일치하는 글자</span>
+                            <span className="char-stat-value">{match.differences.matchingChars}</span>
+                          </div>
+                          <div className="char-stat">
+                            <span className="char-stat-label">전체 글자</span>
+                            <span className="char-stat-value">{match.differences.totalChars}</span>
+                          </div>
+                          <div className="char-stat">
+                            <span className="char-stat-label">글자 일치율</span>
+                            <span className="char-stat-value">
+                              {((match.differences.matchingChars / match.differences.totalChars) * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {(match.differences?.common?.length > 0 ||
+                      match.differences?.added?.length > 0 ||
+                      match.differences?.removed?.length > 0) && (
+                      <div className="differences">
+                        {match.differences?.common?.length > 0 && (
+                          <div className="diff-section">
+                            <label>✓ 같은 단어 ({match.differences.common.length}개):</label>
+                            <div className="word-tags">
+                              {match.differences.common.slice(0, 20).map((word, i) => (
+                                <span key={i} className="word-tag common">{word}</span>
+                              ))}
+                              {match.differences.common.length > 20 && (
+                                <span className="word-tag common">+{match.differences.common.length - 20}개 더</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {match.differences?.removed?.length > 0 && (
+                          <div className="diff-section">
+                            <label>- 원본에만 있는 단어 ({match.differences.removed.length}개):</label>
+                            <div className="word-tags">
+                              {match.differences.removed.map((word, i) => (
+                                <span key={i} className="word-tag removed">{word}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {match.differences?.added?.length > 0 && (
+                          <div className="diff-section">
+                            <label>+ 비교 문서에만 있는 단어 ({match.differences.added.length}개):</label>
+                            <div className="word-tags">
+                              {match.differences.added.map((word, i) => (
+                                <span key={i} className="word-tag added">{word}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

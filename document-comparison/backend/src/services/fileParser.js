@@ -36,12 +36,46 @@ class FileParser {
   }
 
   /**
-   * Parse PDF file
+   * Parse PDF file with page information
    */
   async parsePDF(filePath) {
     const dataBuffer = await fs.readFile(filePath);
-    const data = await pdf(dataBuffer);
-    return data.text;
+
+    // First get total pages
+    const pdfData = await pdf(dataBuffer);
+    const numPages = pdfData.numpages;
+
+    // Extract text from each page
+    const pages = [];
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const pageData = await pdf(dataBuffer, {
+        max: pageNum,
+        version: 'v2.0.550'
+      });
+
+      // Get text for current page by comparing with previous page
+      let pageText = pageData.text;
+      if (pageNum > 1) {
+        const prevPageData = await pdf(dataBuffer, {
+          max: pageNum - 1,
+          version: 'v2.0.550'
+        });
+        // Remove previous pages' text to get only current page
+        pageText = pageData.text.substring(prevPageData.text.length);
+      }
+
+      pages.push({
+        pageNumber: pageNum,
+        text: pageText.trim()
+      });
+    }
+
+    // Return both full text and page info
+    return {
+      fullText: pdfData.text,
+      pages: pages,
+      numPages: numPages
+    };
   }
 
   /**

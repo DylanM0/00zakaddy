@@ -41,6 +41,27 @@ export const compareOneToMany = async (sourceFile, targetFiles, threshold = 90) 
   }
 };
 
+export const compareManyToMany = async (sourceFiles, targetFiles, threshold = 90) => {
+  const formData = new FormData();
+
+  sourceFiles.forEach((file) => {
+    formData.append('sources', file);
+  });
+
+  targetFiles.forEach((file) => {
+    formData.append('targets', file);
+  });
+
+  formData.append('threshold', threshold);
+
+  try {
+    const response = await api.post('/compare/many-to-many', formData);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.error || 'Failed to compare documents');
+  }
+};
+
 export const parseFile = async (file) => {
   const formData = new FormData();
   formData.append('file', file);

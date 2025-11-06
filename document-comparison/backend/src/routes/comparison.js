@@ -200,6 +200,152 @@ router.post('/one-to-many', upload.fields([
 });
 
 /**
+ * POST /api/compare/many-to-many
+ * Compare multiple source documents with multiple target documents
+ */
+router.post('/many-to-many', upload.fields([
+  { name: 'sources', maxCount: 10 },
+  { name: 'targets', maxCount: 10 }
+]), async (req, res) => {
+  try {
+    const { threshold = 90 } = req.body;
+
+    if (!req.files.sources || !req.files.targets) {
+      return res.status(400).json({ error: 'Source files and target files are required' });
+    }
+
+    const sourceFiles = req.files.sources;
+    const targetFiles = req.files.targets;
+
+    // Parse all source files
+    const sources = await Promise.all(
+      sourceFiles.map(async (file) => {
+        const ext = path.extname(file.originalname).substring(1);
+        const data = await fileParser.parseFile(file.path, ext);
+        const lines = similarityService.splitIntoLines(data.text);
+
+        return {
+          name: file.originalname,
+          text: data.text,
+          lines: lines,
+          path: file.path,
+          isPDF: data.isPDF,
+          ...(data.isPDF && {
+            pages: data.pages,
+            numPages: data.numPages
+          })
+        };
+      })
+    );
+
+    // Parse all target files
+    const targets = await Promise.all(
+      targetFiles.map(async (file) => {
+        const ext = path.extname(file.originalname).substring(1);
+        const data = await fileParser.parseFile(file.path, ext);
+        const lines = similarityService.splitIntoLines(data.text);
+
+        return {
+          name: file.originalname,
+          text: data.text,
+          lines: lines,
+          path: file.path,
+          isPDF: data.isPDF,
+          ...(data.isPDF && {
+            pages: data.pages,
+            numPages: data.numPages
+          })
+        };
+      })
+    );
+
+    // Compare each source with all targets
+    const comparisonMatrix = sources.map((source, sourceIndex) => {
+      const sourceLines = source.lines;
+
+      // Compare this source with all targets
+      const targetComparisons = targets.map((target, targetIndex) => {
+        const comparison = similarityService.compareOneToOne(
+          source.text,
+          target.text,
+          parseFloat(threshold)
+        );
+
+        const statistics = similarityService.getStatistics(
+          comparison.matches,
+          sourceLines,
+          target.lines
+        );
+
+        return {
+          targetIndex,
+          targetName: target.name,
+          targetText: target.text,
+          targetLines: target.lines,
+          isPDF: target.isPDF,
+          ...(target.isPDF && {
+            pages: target.pages,
+            numPages: target.numPages
+          }),
+          comparison,
+          statistics,
+          overallSimilarity: comparison.overallSimilarity,
+          totalMatches: comparison.totalMatches
+        };
+      });
+
+      return {
+        sourceIndex,
+        sourceName: source.name,
+        sourceText: source.text,
+        sourceLines: source.lines,
+        isPDF: source.isPDF,
+        ...(source.isPDF && {
+          pages: source.pages,
+          numPages: source.numPages
+        }),
+        targetComparisons
+      };
+    });
+
+    // Clean up uploaded files
+    await Promise.all([
+      ...sourceFiles.map(file => fs.unlink(file.path)),
+      ...targetFiles.map(file => fs.unlink(file.path))
+    ]);
+
+    res.json({
+      success: true,
+      sources: sources.map(s => ({
+        name: s.name,
+        text: s.text,
+        lines: s.lines,
+        isPDF: s.isPDF,
+        ...(s.isPDF && {
+          pages: s.pages,
+          numPages: s.numPages
+        })
+      })),
+      targets: targets.map(t => ({
+        name: t.name,
+        text: t.text,
+        lines: t.lines,
+        isPDF: t.isPDF,
+        ...(t.isPDF && {
+          pages: t.pages,
+          numPages: t.numPages
+        })
+      })),
+      comparisonMatrix,
+      threshold: parseFloat(threshold)
+    });
+  } catch (error) {
+    console.error('Many-to-many comparison error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/parse
  * Parse a single file and return its text content
  */

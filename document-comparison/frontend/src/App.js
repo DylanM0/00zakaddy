@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import FileUploader from './components/FileUploader';
 import ComparisonResult from './components/ComparisonResult';
-import { compareOneToOne, compareOneToMany } from './services/api';
+import { compareOneToOne, compareOneToMany, compareManyToMany } from './services/api';
 import { FiSettings, FiFileText } from 'react-icons/fi';
 import './styles/App.css';
 
 function App() {
-  const [mode, setMode] = useState('one-to-one'); // 'one-to-one' or 'one-to-many'
+  const [mode, setMode] = useState('one-to-one'); // 'one-to-one', 'one-to-many', or 'many-to-many'
   const [sourceFile, setSourceFile] = useState(null);
+  const [sourceFiles, setSourceFiles] = useState([]);
   const [targetFile, setTargetFile] = useState(null);
   const [targetFiles, setTargetFiles] = useState([]);
   const [threshold, setThreshold] = useState(90);
@@ -19,19 +20,30 @@ function App() {
     setError(null);
     setResult(null);
 
-    if (!sourceFile) {
-      setError('원본 문서를 선택해주세요.');
-      return;
-    }
+    if (mode === 'many-to-many') {
+      if (sourceFiles.length === 0) {
+        setError('원본 문서를 하나 이상 선택해주세요.');
+        return;
+      }
+      if (targetFiles.length === 0) {
+        setError('비교할 문서를 하나 이상 선택해주세요.');
+        return;
+      }
+    } else {
+      if (!sourceFile) {
+        setError('원본 문서를 선택해주세요.');
+        return;
+      }
 
-    if (mode === 'one-to-one' && !targetFile) {
-      setError('비교할 문서를 선택해주세요.');
-      return;
-    }
+      if (mode === 'one-to-one' && !targetFile) {
+        setError('비교할 문서를 선택해주세요.');
+        return;
+      }
 
-    if (mode === 'one-to-many' && targetFiles.length === 0) {
-      setError('비교할 문서를 하나 이상 선택해주세요.');
-      return;
+      if (mode === 'one-to-many' && targetFiles.length === 0) {
+        setError('비교할 문서를 하나 이상 선택해주세요.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -40,8 +52,10 @@ function App() {
       let response;
       if (mode === 'one-to-one') {
         response = await compareOneToOne(sourceFile, targetFile, threshold);
-      } else {
+      } else if (mode === 'one-to-many') {
         response = await compareOneToMany(sourceFile, targetFiles, threshold);
+      } else {
+        response = await compareManyToMany(sourceFiles, targetFiles, threshold);
       }
 
       setResult(response);
@@ -54,6 +68,7 @@ function App() {
 
   const handleReset = () => {
     setSourceFile(null);
+    setSourceFiles([]);
     setTargetFile(null);
     setTargetFiles([]);
     setResult(null);
@@ -91,6 +106,13 @@ function App() {
                   <div className="mode-icon">1:N</div>
                   <div className="mode-label">다중 비교</div>
                 </button>
+                <button
+                  className={`mode-btn ${mode === 'many-to-many' ? 'active' : ''}`}
+                  onClick={() => setMode('many-to-many')}
+                >
+                  <div className="mode-icon">N:N</div>
+                  <div className="mode-label">전체 비교</div>
+                </button>
               </div>
 
               <div className="settings-panel">
@@ -122,27 +144,46 @@ function App() {
               </div>
 
               <div className="upload-area">
-                <FileUploader
-                  label="원본 문서"
-                  onFileSelect={setSourceFile}
-                  selectedFile={sourceFile}
-                  multiple={false}
-                />
-
-                {mode === 'one-to-one' ? (
-                  <FileUploader
-                    label="비교 문서"
-                    onFileSelect={setTargetFile}
-                    selectedFile={targetFile}
-                    multiple={false}
-                  />
+                {mode === 'many-to-many' ? (
+                  <>
+                    <FileUploader
+                      label="원본 문서들 (최대 10개)"
+                      onFileSelect={setSourceFiles}
+                      selectedFile={sourceFiles}
+                      multiple={true}
+                    />
+                    <FileUploader
+                      label="비교 문서들 (최대 10개)"
+                      onFileSelect={setTargetFiles}
+                      selectedFile={targetFiles}
+                      multiple={true}
+                    />
+                  </>
                 ) : (
-                  <FileUploader
-                    label="비교 문서들 (최대 10개)"
-                    onFileSelect={setTargetFiles}
-                    selectedFile={targetFiles}
-                    multiple={true}
-                  />
+                  <>
+                    <FileUploader
+                      label="원본 문서"
+                      onFileSelect={setSourceFile}
+                      selectedFile={sourceFile}
+                      multiple={false}
+                    />
+
+                    {mode === 'one-to-one' ? (
+                      <FileUploader
+                        label="비교 문서"
+                        onFileSelect={setTargetFile}
+                        selectedFile={targetFile}
+                        multiple={false}
+                      />
+                    ) : (
+                      <FileUploader
+                        label="비교 문서들 (최대 10개)"
+                        onFileSelect={setTargetFiles}
+                        selectedFile={targetFiles}
+                        multiple={true}
+                      />
+                    )}
+                  </>
                 )}
               </div>
 
@@ -183,9 +224,10 @@ function App() {
                 <h3>지원 기능</h3>
                 <ul>
                   <li>✓ 다양한 파일 형식 지원 (PDF, Word, Excel, CSV, TXT)</li>
-                  <li>✓ 1:1 및 1:다 비교 모드</li>
-                  <li>✓ AI 기반 유사도 분석</li>
+                  <li>✓ 1:1, 1:N, N:N 비교 모드</li>
+                  <li>✓ 문자 기반 유사도 분석</li>
                   <li>✓ 단어 단위 차이점 하이라이트</li>
+                  <li>✓ PDF 페이지 정보 표시</li>
                   <li>✓ 실시간 유사도 퍼센트 표시</li>
                 </ul>
               </div>

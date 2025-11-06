@@ -61,8 +61,12 @@ router.post('/one-to-one', upload.fields([
     const sourceExt = path.extname(sourceFile.originalname).substring(1);
     const targetExt = path.extname(targetFile.originalname).substring(1);
 
-    const sourceText = await fileParser.parseFile(sourceFile.path, sourceExt);
-    const targetText = await fileParser.parseFile(targetFile.path, targetExt);
+    const sourceData = await fileParser.parseFile(sourceFile.path, sourceExt);
+    const targetData = await fileParser.parseFile(targetFile.path, targetExt);
+
+    // Extract text from parsed data
+    const sourceText = sourceData.text;
+    const targetText = targetData.text;
 
     // Compare documents
     const comparison = similarityService.compareOneToOne(sourceText, targetText, parseFloat(threshold));
@@ -81,12 +85,22 @@ router.post('/one-to-one', upload.fields([
       source: {
         name: sourceFile.originalname,
         text: sourceText,
-        lines: sourceLines
+        lines: sourceLines,
+        isPDF: sourceData.isPDF,
+        ...(sourceData.isPDF && {
+          pages: sourceData.pages,
+          numPages: sourceData.numPages
+        })
       },
       target: {
         name: targetFile.originalname,
         text: targetText,
-        lines: targetLines
+        lines: targetLines,
+        isPDF: targetData.isPDF,
+        ...(targetData.isPDF && {
+          pages: targetData.pages,
+          numPages: targetData.numPages
+        })
       },
       comparison,
       statistics
@@ -117,18 +131,24 @@ router.post('/one-to-many', upload.fields([
 
     // Parse source file
     const sourceExt = path.extname(sourceFile.originalname).substring(1);
-    const sourceText = await fileParser.parseFile(sourceFile.path, sourceExt);
+    const sourceData = await fileParser.parseFile(sourceFile.path, sourceExt);
+    const sourceText = sourceData.text;
     const sourceLines = similarityService.splitIntoLines(sourceText);
 
     // Parse all target files
     const targets = await Promise.all(
       targetFiles.map(async (file) => {
         const ext = path.extname(file.originalname).substring(1);
-        const text = await fileParser.parseFile(file.path, ext);
+        const data = await fileParser.parseFile(file.path, ext);
         return {
           name: file.originalname,
-          text: text,
-          path: file.path
+          text: data.text,
+          path: file.path,
+          isPDF: data.isPDF,
+          ...(data.isPDF && {
+            pages: data.pages,
+            numPages: data.numPages
+          })
         };
       })
     );
@@ -145,7 +165,12 @@ router.post('/one-to-many', upload.fields([
         ...result,
         targetText: targets[index].text,
         targetLines: targetLines,
-        statistics
+        statistics,
+        isPDF: targets[index].isPDF,
+        ...(targets[index].isPDF && {
+          pages: targets[index].pages,
+          numPages: targets[index].numPages
+        })
       };
     });
 
@@ -158,7 +183,12 @@ router.post('/one-to-many', upload.fields([
       source: {
         name: sourceFile.originalname,
         text: sourceText,
-        lines: sourceLines
+        lines: sourceLines,
+        isPDF: sourceData.isPDF,
+        ...(sourceData.isPDF && {
+          pages: sourceData.pages,
+          numPages: sourceData.numPages
+        })
       },
       results: detailedResults,
       threshold: parseFloat(threshold)

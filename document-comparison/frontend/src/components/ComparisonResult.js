@@ -93,6 +93,24 @@ const ComparisonResult = ({ result, mode }) => {
     return result.comparison.matches.filter(m => m.sourceLineIndex === lineIndex);
   };
 
+  // Get page number for a given line index (for PDF)
+  const getPageForLine = (pages, lineIndex, allLines) => {
+    if (!pages || pages.length === 0) return null;
+
+    let cumulativeLines = 0;
+    for (const page of pages) {
+      const pageLines = page.text.split(/\n/).filter(l => l.trim().length > 0);
+      if (lineIndex < cumulativeLines + pageLines.length) {
+        return {
+          pageNumber: page.pageNumber,
+          lineInPage: lineIndex - cumulativeLines + 1
+        };
+      }
+      cumulativeLines += pageLines.length;
+    }
+    return { pageNumber: pages[pages.length - 1].pageNumber, lineInPage: 1 };
+  };
+
   if (mode === 'one-to-one') {
     return (
       <div className="comparison-result">
@@ -156,6 +174,9 @@ const ComparisonResult = ({ result, mode }) => {
                 const matches = getMatchesForSourceLine(idx);
                 const highestMatch = matches.length > 0 ? matches[0] : null;
                 const isSelected = selectedSourceLine === idx;
+                const sourcePageInfo = result.source.isPDF
+                  ? getPageForLine(result.source.pages, idx, result.source.lines)
+                  : null;
 
                 return (
                   <div
@@ -170,17 +191,32 @@ const ComparisonResult = ({ result, mode }) => {
                     onMouseEnter={() => setHoveredSourceLine(idx)}
                     onMouseLeave={() => setHoveredSourceLine(null)}
                   >
-                    <span className="line-number">{idx + 1}</span>
+                    <span className="line-number">
+                      {sourcePageInfo && (
+                        <span className="page-badge">P{sourcePageInfo.pageNumber}</span>
+                      )}
+                      {idx + 1}
+                    </span>
                     <span className="line-text">{line}</span>
 
                     {hoveredSourceLine === idx && matches.length > 0 && (
                       <div className="line-tooltip">
-                        {matches.map((match, mIdx) => (
-                          <div key={mIdx}>
-                            {result.target.name}의 {match.targetLineIndex + 1}번째 문장과 {match.similarity}% 유사
-                            {mIdx < matches.length - 1 && <br />}
-                          </div>
-                        ))}
+                        {matches.map((match, mIdx) => {
+                          const targetPageInfo = result.target.isPDF
+                            ? getPageForLine(result.target.pages, match.targetLineIndex, result.target.lines)
+                            : null;
+
+                          return (
+                            <div key={mIdx}>
+                              {result.target.name}의
+                              {targetPageInfo
+                                ? ` 페이지 ${targetPageInfo.pageNumber} - ${match.targetLineIndex + 1}번째 문장`
+                                : ` ${match.targetLineIndex + 1}번째 문장`
+                              }과 {match.similarity}% 유사
+                              {mIdx < matches.length - 1 && <br />}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -196,6 +232,9 @@ const ComparisonResult = ({ result, mode }) => {
               {result.target.lines.map((line, idx) => {
                 const match = result.comparison.matches.find(m => m.targetLineIndex === idx);
                 const isSelected = selectedTargetLine === idx;
+                const targetPageInfo = result.target.isPDF
+                  ? getPageForLine(result.target.pages, idx, result.target.lines)
+                  : null;
 
                 return (
                   <div
@@ -208,7 +247,12 @@ const ComparisonResult = ({ result, mode }) => {
                     } : {}}
                     onClick={() => handleTargetLineClick(idx)}
                   >
-                    <span className="line-number">{idx + 1}</span>
+                    <span className="line-number">
+                      {targetPageInfo && (
+                        <span className="page-badge">P{targetPageInfo.pageNumber}</span>
+                      )}
+                      {idx + 1}
+                    </span>
                     <span className="line-text">{line}</span>
                   </div>
                 );

@@ -667,6 +667,20 @@ body {
   text-align: right;
   flex-shrink: 0;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.page-badge {
+  background: var(--primary-color);
+  color: white;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .line-text {

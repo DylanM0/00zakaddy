@@ -10,23 +10,30 @@ class FileParser {
    * Parse file based on its type and extract text content
    * @param {string} filePath - Path to the file
    * @param {string} fileType - Type of the file (pdf, docx, txt, xlsx, csv)
-   * @returns {Promise<string>} Extracted text content
+   * @returns {Promise<Object>} Extracted text content (and page info for PDF)
    */
   async parseFile(filePath, fileType) {
     try {
       switch (fileType.toLowerCase()) {
         case 'pdf':
-          return await this.parsePDF(filePath);
+          const pdfData = await this.parsePDF(filePath);
+          // Return object with text and metadata for PDF
+          return {
+            text: pdfData.fullText,
+            isPDF: true,
+            pages: pdfData.pages,
+            numPages: pdfData.numPages
+          };
         case 'docx':
         case 'doc':
-          return await this.parseWord(filePath);
+          return { text: await this.parseWord(filePath), isPDF: false };
         case 'txt':
-          return await this.parseText(filePath);
+          return { text: await this.parseText(filePath), isPDF: false };
         case 'xlsx':
         case 'xls':
-          return await this.parseExcel(filePath);
+          return { text: await this.parseExcel(filePath), isPDF: false };
         case 'csv':
-          return await this.parseCSV(filePath);
+          return { text: await this.parseCSV(filePath), isPDF: false };
         default:
           throw new Error(`Unsupported file type: ${fileType}`);
       }
